@@ -73,12 +73,23 @@ export class SearchHandler {
 
 			if (stream) {
 				// Handle streaming response
-				const streamedContent = await this.apiService.searchStream(apiParams);
+				const streamResult = await this.apiService.searchStream(apiParams);
+				let responseText = modelInfo + streamResult.content;
+				
+				// Add citations if available
+				if (streamResult.search_results && streamResult.search_results.length > 0) {
+					responseText += '\n\n## Sources\n';
+					streamResult.search_results.forEach((result, index) => {
+						const dateInfo = result.date ? ` (${result.date})` : '';
+						responseText += `[${index + 1}] ${result.title}${dateInfo}\n${result.url}\n\n`;
+					});
+				}
+				
 				return {
 					content: [
 						{
 							type: "text",
-							text: modelInfo + streamedContent,
+							text: responseText,
 						},
 					],
 				};
@@ -87,11 +98,22 @@ export class SearchHandler {
 				const response = await this.apiService.search(apiParams);
 
 				if (response.choices && response.choices.length > 0) {
+					let responseText = modelInfo + response.choices[0].message.content;
+					
+					// Add citations if available
+					if (response.search_results && response.search_results.length > 0) {
+						responseText += '\n\n## Sources\n';
+						response.search_results.forEach((result, index) => {
+							const dateInfo = result.date ? ` (${result.date})` : '';
+							responseText += `[${index + 1}] ${result.title}${dateInfo}\n${result.url}\n\n`;
+						});
+					}
+
 					return {
 						content: [
 							{
 								type: "text",
-								text: modelInfo + response.choices[0].message.content,
+								text: responseText,
 							},
 						],
 					};

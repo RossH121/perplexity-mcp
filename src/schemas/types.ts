@@ -11,6 +11,11 @@ export interface SearchResponse {
 			};
 		},
 	];
+	search_results?: Array<{
+		title: string;
+		url: string;
+		date?: string;
+	}>;
 }
 
 export interface StreamChunk {

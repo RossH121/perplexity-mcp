@@ -34,7 +34,7 @@ export class PerplexityApiService {
 	/**
 	 * Handles streaming search responses
 	 */
-	async searchStream(apiParams: ApiParams): Promise<string> {
+	async searchStream(apiParams: ApiParams): Promise<{ content: string; search_results?: Array<{ title: string; url: string; date?: string }> }> {
 		const response = await this.axiosInstance.post(
 			"/chat/completions",
 			apiParams,
@@ -45,6 +45,7 @@ export class PerplexityApiService {
 		);
 
 		let fullContent = '';
+		let search_results: Array<{ title: string; url: string; date?: string }> | undefined;
 
 		// Process the streaming response
 		for await (const chunk of response.data) {
@@ -66,6 +67,11 @@ export class PerplexityApiService {
 							if (content) {
 								fullContent += content;
 							}
+							
+							// Check for search results in the final chunk
+							if (parsed.search_results) {
+								search_results = parsed.search_results;
+							}
 						} catch (parseError) {
 							// Skip malformed chunks
 							continue;
@@ -75,7 +81,7 @@ export class PerplexityApiService {
 			}
 		}
 
-		return fullContent;
+		return { content: fullContent, search_results };
 	}
 
 	/**
