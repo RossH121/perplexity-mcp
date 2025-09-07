@@ -2,6 +2,10 @@
 
 An MCP server that provides web search capabilities using Perplexity's API with automatic model selection based on query intent.
 
+<a href="https://glama.ai/mcp/servers/6qmvjay9z5">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/6qmvjay9z5/badge" alt="Perplexity Server MCP server" />
+</a>
+
 ## Prerequisites
 
 - Node.js (v14 or higher)
