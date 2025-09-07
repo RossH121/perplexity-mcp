@@ -244,7 +244,7 @@ class PerplexityServer {
 		this.setupToolHandlers();
 
 		// Error handling
-		this.server.onerror = (error) => console.error("[MCP Error]", error);
+		this.server.onerror = (error) => { /* Silent error handling for MCP compliance */ };
 		process.on("SIGINT", async () => {
 			await this.server.close();
 			process.exit(0);
@@ -408,9 +408,6 @@ class PerplexityServer {
 				// But check if we have a strong match that should override
 				if (selection.score >= 2 && selection.model !== this.currentModel) {
 					// Strong intent match - override manual selection
-					console.error(
-						`Auto-overriding manual model selection due to strong intent match (score: ${selection.score})`,
-					);
 					this.currentModel = selection.model;
 					description = `${selection.description} (auto-selected based on query intent)`;
 				} else {
@@ -479,10 +476,6 @@ class PerplexityServer {
 					error.response?.data?.error?.message ||
 					error.response?.data?.detail ||
 					error.message;
-				console.error(
-					"Full error:",
-					JSON.stringify(error.response?.data, null, 2),
-				);
 				return {
 					content: [
 						{
@@ -716,12 +709,9 @@ class PerplexityServer {
 	async run() {
 		const transport = new StdioServerTransport();
 		await this.server.connect(transport);
-		console.error(
-			`Perplexity Search MCP server running on stdio (default model: ${DEFAULT_MODEL})`,
-		);
-		console.error("Automatic model selection enabled based on query intent");
+		// Server started successfully (logging disabled for STDIO MCP compliance)
 	}
 }
 
 const server = new PerplexityServer();
-server.run().catch(console.error);
+server.run().catch(() => process.exit(1));
