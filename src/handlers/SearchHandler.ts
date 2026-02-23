@@ -10,6 +10,10 @@ import { FilterState } from "../models/FilterState.js";
 import { ErrorHandler } from "../utils/errorHandling.js";
 import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 
+function stripThinkingBlocks(text: string): string {
+	return text.replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim();
+}
+
 export class SearchHandler {
 	constructor(
 		private apiService: PerplexityApiService,
@@ -27,10 +31,16 @@ export class SearchHandler {
 			);
 		}
 
-		const { query, stream = false } = request.params.arguments as SearchArgs;
-		
-		try {
+		const {
+			query,
+			stream = false,
+			search_context_size,
+			reasoning_effort,
+			strip_thinking,
+			search_mode,
+		} = request.params.arguments as SearchArgs;
 
+		try {
 			// Get model selection based on intent
 			const selection = this.modelSelectionService.selectModelBasedOnIntent(query);
 			let description: string;
@@ -38,18 +48,13 @@ export class SearchHandler {
 
 			// Determine which model to use
 			if (this.useAutoSelection) {
-				// Auto-select model based on intent
 				selectedModel = selection.model;
 				description = selection.description;
 			} else {
-				// We're using a manually set model
-				// But check if we have a strong match that should override
 				if (selection.score >= 2 && selection.model !== this.currentModel) {
-					// Strong intent match - override manual selection
 					selectedModel = selection.model;
 					description = `${selection.description} (auto-selected based on query intent)`;
 				} else {
-					// Stick with manually selected model
 					selectedModel = this.currentModel;
 					description = this.modelSelectionService.getModelDescription(this.currentModel);
 				}
@@ -59,63 +64,63 @@ export class SearchHandler {
 			const domainFilterArray = this.filterState.getDomainFilterArray();
 			const recencyFilter = this.filterState.getRecencyFilter();
 
-			// Create API parameters
+			// Create API parameters (includes new params)
 			const apiParams = this.apiService.createApiParams(
 				selectedModel,
 				query,
 				domainFilterArray.length > 0 ? domainFilterArray : undefined,
 				recencyFilter || undefined,
-				stream
+				stream,
+				search_context_size,
+				reasoning_effort,
+				search_mode,
 			);
 
-			// Include model information at the start of responses
 			const modelInfo = `[Using model: ${selectedModel} - ${description}]\n\n`;
 
 			if (stream) {
-				// Handle streaming response
 				const streamResult = await this.apiService.searchStream(apiParams);
-				let responseText = modelInfo + streamResult.content;
-				
-				// Add citations if available
+				let content = streamResult.content;
+
+				if (strip_thinking) {
+					content = stripThinkingBlocks(content);
+				}
+
+				let responseText = modelInfo + content;
+
 				if (streamResult.search_results && streamResult.search_results.length > 0) {
-					responseText += '\n\n## Sources\n';
+					responseText += "\n\n## Sources\n";
 					streamResult.search_results.forEach((result, index) => {
-						const dateInfo = result.date ? ` (${result.date})` : '';
+						const dateInfo = result.date ? ` (${result.date})` : "";
 						responseText += `[${index + 1}] ${result.title}${dateInfo}\n${result.url}\n\n`;
 					});
 				}
-				
+
 				return {
-					content: [
-						{
-							type: "text",
-							text: responseText,
-						},
-					],
+					content: [{ type: "text", text: responseText }],
 				};
 			} else {
-				// Handle regular response
 				const response = await this.apiService.search(apiParams);
 
 				if (response.choices && response.choices.length > 0) {
-					let responseText = modelInfo + response.choices[0].message.content;
-					
-					// Add citations if available
+					let content = response.choices[0].message.content;
+
+					if (strip_thinking) {
+						content = stripThinkingBlocks(content);
+					}
+
+					let responseText = modelInfo + content;
+
 					if (response.search_results && response.search_results.length > 0) {
-						responseText += '\n\n## Sources\n';
+						responseText += "\n\n## Sources\n";
 						response.search_results.forEach((result, index) => {
-							const dateInfo = result.date ? ` (${result.date})` : '';
+							const dateInfo = result.date ? ` (${result.date})` : "";
 							responseText += `[${index + 1}] ${result.title}${dateInfo}\n${result.url}\n\n`;
 						});
 					}
 
 					return {
-						content: [
-							{
-								type: "text",
-								text: responseText,
-							},
-						],
+						content: [{ type: "text", text: responseText }],
 					};
 				}
 				throw new Error("No response content received");
@@ -124,9 +129,7 @@ export class SearchHandler {
 			if (error instanceof Error && error.message === "No response content received") {
 				throw error;
 			}
-			
-			// Handle API errors
-			return stream 
+			return stream
 				? ErrorHandler.handleStreamingApiError(error)
 				: ErrorHandler.handleApiError(error);
 		}

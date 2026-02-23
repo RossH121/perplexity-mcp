@@ -20,6 +20,7 @@ import { FilterState } from "../models/FilterState.js";
 
 // Handlers
 import { SearchHandler } from "../handlers/SearchHandler.js";
+import { RawSearchHandler } from "../handlers/RawSearchHandler.js";
 import { DomainFilterHandler } from "../handlers/DomainFilterHandler.js";
 import { RecencyFilterHandler } from "../handlers/RecencyFilterHandler.js";
 import { FilterManagementHandler } from "../handlers/FilterManagementHandler.js";
@@ -42,6 +43,7 @@ export class PerplexityMcpServer {
 	
 	// Handlers
 	private searchHandler: SearchHandler;
+	private rawSearchHandler: RawSearchHandler;
 	private domainFilterHandler: DomainFilterHandler;
 	private recencyFilterHandler: RecencyFilterHandler;
 	private filterManagementHandler: FilterManagementHandler;
@@ -79,6 +81,7 @@ export class PerplexityMcpServer {
 			this.useAutoSelection
 		);
 		
+		this.rawSearchHandler = new RawSearchHandler(this.apiService);
 		this.domainFilterHandler = new DomainFilterHandler(this.filterState);
 		this.recencyFilterHandler = new RecencyFilterHandler(this.filterState);
 		this.filterManagementHandler = new FilterManagementHandler(this.filterState);
@@ -116,6 +119,8 @@ export class PerplexityMcpServer {
 			switch (request.params.name) {
 				case "search":
 					return this.searchHandler.handle(request);
+				case "raw_search":
+					return this.rawSearchHandler.handle(request);
 				case "domain_filter":
 					return this.domainFilterHandler.handle(request);
 				case "recency_filter":

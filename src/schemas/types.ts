@@ -15,6 +15,7 @@ export interface SearchResponse {
 		title: string;
 		url: string;
 		date?: string;
+		snippet?: string;
 	}>;
 }
 
@@ -26,6 +27,12 @@ export interface StreamChunk {
 			};
 		},
 	];
+	search_results?: Array<{
+		title: string;
+		url: string;
+		date?: string;
+		snippet?: string;
+	}>;
 }
 
 // Model selection types
@@ -50,6 +57,20 @@ export interface DomainFilters {
 export interface SearchArgs {
 	query: string;
 	stream?: boolean;
+	search_context_size?: "low" | "medium" | "high";
+	reasoning_effort?: "minimal" | "low" | "medium" | "high";
+	strip_thinking?: boolean;
+	search_mode?: "web" | "academic" | "sec";
+}
+
+export interface RawSearchArgs {
+	query: string;
+	max_results?: number;
+	search_mode?: "web" | "academic" | "sec";
+	recency?: string;
+	search_after_date?: string;
+	search_before_date?: string;
+	country?: string;
 }
 
 export interface DomainArgs {
@@ -86,24 +107,38 @@ export interface ApiParams {
 	}[];
 	search_domain_filter?: string[];
 	search_recency_filter?: string;
+	search_mode?: "web" | "academic" | "sec";
+	reasoning_effort?: "minimal" | "low" | "medium" | "high";
+	web_search_options?: {
+		search_context_size?: "low" | "medium" | "high";
+	};
 	stream?: boolean;
+}
+
+// Raw search result type
+export interface RawSearchResult {
+	title: string;
+	url: string;
+	snippet: string;
+	date?: string;
+	last_updated?: string;
 }
 
 // Valid models and filters
 export const VALID_MODELS = [
 	"sonar-deep-research",
 	"sonar-reasoning-pro",
-	"sonar-reasoning",
 	"sonar-pro",
 	"sonar",
 ] as const;
 
 export const VALID_RECENCY_FILTERS = [
 	"hour",
-	"day", 
+	"day",
 	"week",
 	"month",
-	"none"
+	"year",
+	"none",
 ] as const;
 
 export type ValidModel = typeof VALID_MODELS[number];

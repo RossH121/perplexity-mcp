@@ -61,9 +61,10 @@ export class FilterState {
 		this.recencyFilter = filter;
 		const timeDescription = {
 			hour: "hour",
-			day: "24 hours", 
+			day: "24 hours",
 			week: "7 days",
-			month: "30 days"
+			month: "30 days",
+			year: "year",
 		}[filter] || filter;
 
 		return `Recency filter set to "${filter}". Searches will be limited to content from the last ${timeDescription}.`;
@@ -101,8 +102,9 @@ export class FilterState {
 					{
 						hour: "hour",
 						day: "24 hours",
-						week: "7 days", 
-						month: "30 days"
+						week: "7 days",
+						month: "30 days",
+						year: "year",
 					}[this.recencyFilter] || this.recencyFilter
 				})`
 			: "No recency filter configured.";

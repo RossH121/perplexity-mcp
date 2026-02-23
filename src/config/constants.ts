@@ -27,13 +27,14 @@ export const MODEL_SELECTION_MAP: Record<string, ModelSelectionCriteria> = {
 			"technical",
 			"complex problem",
 			"figure out",
+			"reason",
+			"think",
+			"analyze",
+			"deduce",
+			"evaluate",
 		],
 		description:
-			"optimized for advanced logical reasoning and complex problem-solving",
-	},
-	"sonar-reasoning": {
-		keywords: ["reason", "think", "analyze", "deduce", "evaluate"],
-		description: "designed for reasoning tasks with balanced performance",
+			"optimized for advanced logical reasoning, chain-of-thought, and complex problem-solving",
 	},
 	"sonar-pro": {
 		keywords: [
@@ -57,7 +58,7 @@ export const MODEL_SELECTION_MAP: Record<string, ModelSelectionCriteria> = {
 // API Configuration
 export const API_CONFIG = {
 	BASE_URL: "https://api.perplexity.ai",
-	TIMEOUT: 30000,
+	TIMEOUT: 300000, // 5 minutes — needed for sonar-deep-research
 	MAX_DOMAINS: 20,
 } as const;
 

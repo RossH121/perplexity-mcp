@@ -1,87 +1,81 @@
 /**
  * Service for communicating with the Perplexity AI API
+ * Uses the official @perplexity-ai/perplexity_ai SDK
  */
 
-import axios, { type AxiosInstance } from "axios";
-import { SearchResponse, ApiParams } from "../schemas/types.js";
+import Perplexity from "@perplexity-ai/perplexity_ai";
+import { SearchResponse, ApiParams, RawSearchArgs, RawSearchResult } from "../schemas/types.js";
 import { API_CONFIG } from "../config/constants.js";
 import { EnvironmentConfig } from "../config/environment.js";
 
 export class PerplexityApiService {
-	private axiosInstance: AxiosInstance;
+	private client: Perplexity;
 
 	constructor(private config: EnvironmentConfig) {
-		this.axiosInstance = axios.create({
-			baseURL: API_CONFIG.BASE_URL,
-			headers: {
-				Authorization: `Bearer ${this.config.apiKey}`,
-				"Content-Type": "application/json",
-			},
+		this.client = new Perplexity({
+			apiKey: this.config.apiKey,
+			timeout: API_CONFIG.TIMEOUT,
 		});
 	}
 
 	/**
-	 * Performs a search using the Perplexity API
+	 * Performs a chat-based search using the Perplexity API
 	 */
 	async search(apiParams: ApiParams): Promise<SearchResponse> {
-		const response = await this.axiosInstance.post<SearchResponse>(
-			"/chat/completions",
-			apiParams,
-		);
-		return response.data;
+		const { stream, ...params } = apiParams;
+		const response = await (this.client.chat.completions.create as Function)({
+			...params,
+			stream: false,
+		});
+		return response as SearchResponse;
 	}
 
 	/**
 	 * Handles streaming search responses
 	 */
-	async searchStream(apiParams: ApiParams): Promise<{ content: string; search_results?: Array<{ title: string; url: string; date?: string }> }> {
-		const response = await this.axiosInstance.post(
-			"/chat/completions",
-			apiParams,
-			{
-				responseType: 'stream',
-				timeout: API_CONFIG.TIMEOUT,
+	async searchStream(apiParams: ApiParams): Promise<{
+		content: string;
+		search_results?: Array<{ title: string; url: string; date?: string; snippet?: string }>;
+	}> {
+		const { stream, ...params } = apiParams;
+		const streamResponse = await (this.client.chat.completions.create as Function)({
+			...params,
+			stream: true,
+		});
+
+		let fullContent = "";
+		let search_results: Array<{ title: string; url: string; date?: string; snippet?: string }> | undefined;
+
+		for await (const chunk of streamResponse) {
+			const content = chunk.choices?.[0]?.delta?.content;
+			if (content) {
+				fullContent += content;
 			}
-		);
-
-		let fullContent = '';
-		let search_results: Array<{ title: string; url: string; date?: string }> | undefined;
-
-		// Process the streaming response
-		for await (const chunk of response.data) {
-			const lines = chunk.toString().split('\n');
-			
-			for (const line of lines) {
-				if (line.startsWith('data: ')) {
-					const data = line.slice(6).trim();
-					
-					if (data === '[DONE]') {
-						break;
-					}
-					
-					if (data) {
-						try {
-							const parsed = JSON.parse(data);
-							const content = parsed.choices[0]?.delta?.content;
-							
-							if (content) {
-								fullContent += content;
-							}
-							
-							// Check for search results in the final chunk
-							if (parsed.search_results) {
-								search_results = parsed.search_results;
-							}
-						} catch (parseError) {
-							// Skip malformed chunks
-							continue;
-						}
-					}
-				}
+			if (chunk.search_results) {
+				search_results = chunk.search_results;
 			}
 		}
 
 		return { content: fullContent, search_results };
+	}
+
+	/**
+	 * Performs a raw search using the Perplexity /search endpoint (no LLM synthesis)
+	 */
+	async rawSearch(args: RawSearchArgs): Promise<RawSearchResult[]> {
+		const params: Record<string, unknown> = {
+			query: args.query,
+		};
+
+		if (args.max_results !== undefined) params["maxResults"] = args.max_results;
+		if (args.search_mode !== undefined) params["searchMode"] = args.search_mode;
+		if (args.recency !== undefined) params["searchRecencyFilter"] = args.recency;
+		if (args.search_after_date !== undefined) params["searchAfterDateFilter"] = args.search_after_date;
+		if (args.search_before_date !== undefined) params["searchBeforeDateFilter"] = args.search_before_date;
+		if (args.country !== undefined) params["country"] = args.country;
+
+		const response = await (this.client.search.create as Function)(params);
+		return (response.results ?? []) as RawSearchResult[];
 	}
 
 	/**
@@ -92,7 +86,10 @@ export class PerplexityApiService {
 		query: string,
 		domainFilters?: string[],
 		recencyFilter?: string,
-		stream?: boolean
+		stream?: boolean,
+		searchContextSize?: "low" | "medium" | "high",
+		reasoningEffort?: "minimal" | "low" | "medium" | "high",
+		searchMode?: "web" | "academic" | "sec",
 	): ApiParams {
 		const apiParams: ApiParams = {
 			model,
@@ -108,17 +105,26 @@ export class PerplexityApiService {
 			],
 		};
 
-		// Only add search_domain_filter if we have domains to filter
 		if (domainFilters && domainFilters.length > 0) {
 			apiParams.search_domain_filter = domainFilters;
 		}
 
-		// Add recency filter if set
 		if (recencyFilter) {
 			apiParams.search_recency_filter = recencyFilter;
 		}
 
-		// Add stream parameter if requested
+		if (searchContextSize) {
+			apiParams.web_search_options = { search_context_size: searchContextSize };
+		}
+
+		if (reasoningEffort) {
+			apiParams.reasoning_effort = reasoningEffort;
+		}
+
+		if (searchMode) {
+			apiParams.search_mode = searchMode;
+		}
+
 		if (stream) {
 			apiParams.stream = true;
 		}
