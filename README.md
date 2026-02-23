@@ -1,6 +1,6 @@
 # Perplexity MCP Server
 
-An MCP server that provides web search capabilities using Perplexity's API with automatic model selection based on query intent.
+An MCP server that provides Perplexity AI web search capabilities to Claude, with automatic model selection, stateful filters, and 7 purpose-built tools.
 
 <a href="https://glama.ai/mcp/servers/6qmvjay9z5">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/6qmvjay9z5/badge" alt="Perplexity Server MCP server" />
@@ -8,13 +8,11 @@ An MCP server that provides web search capabilities using Perplexity's API with 
 
 ## Prerequisites
 
-- Node.js (v14 or higher)
-- A Perplexity API key (get one at <https://www.perplexity.ai/settings/api>)
-- Claude Desktop App
+- Node.js v20 or higher
+- A Perplexity API key — get one at <https://www.perplexity.ai/settings/api>
+- Claude Desktop (or any MCP-compatible client)
 
 ## Installation
-
-### Installing via Git
 
 1. Clone this repository:
 
@@ -37,21 +35,17 @@ An MCP server that provides web search capabilities using Perplexity's API with 
 
 ## Configuration
 
-1. Get your Perplexity API key from <https://www.perplexity.ai/settings/api>
-
-2. Add the server to Claude's config file at `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Add the server to Claude's config file at `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "perplexity-server": {
       "command": "node",
-      "args": [
-        "/absolute/path/to/perplexity-mcp/build/index.js"
-      ],
+      "args": ["/absolute/path/to/perplexity-mcp/build/index.js"],
       "env": {
         "PERPLEXITY_API_KEY": "your-api-key-here",
-        "PERPLEXITY_MODEL": "sonar"
+        "PERPLEXITY_MODEL": "sonar-pro"
       }
     }
   }
@@ -60,92 +54,130 @@ An MCP server that provides web search capabilities using Perplexity's API with 
 
 Replace `/absolute/path/to` with the actual path to where you cloned the repository.
 
-### Available Models
+## Available Models
 
-The server now supports automatic model selection based on query intent, but you can also specify a default model using the `PERPLEXITY_MODEL` environment variable. Available options:
+The server automatically selects the best model based on your query, but you can also set a default via `PERPLEXITY_MODEL`:
 
-- `sonar-deep-research` - Specialized for extensive research and expert-level analysis across domains
-- `sonar-reasoning-pro` - Optimized for advanced logical reasoning and complex problem-solving
-- `sonar-reasoning` - Designed for reasoning tasks with balanced performance
-- `sonar-pro` - General-purpose model with excellent search capabilities and citation density
-- `sonar` - Fast and efficient for straightforward queries
+| Model | Best for |
+|---|---|
+| `sonar-deep-research` | Comprehensive reports, exhaustive multi-source research |
+| `sonar-reasoning-pro` | Complex logic, math, chain-of-thought analysis |
+| `sonar-pro` | General search, factual queries (default) |
+| `sonar` | Quick, simple lookups |
 
-The default model (specified in the environment variable) will be used as the baseline for automatic model selection.
+For pricing and availability: <https://docs.perplexity.ai/guides/pricing>
 
-For up-to-date model pricing and availability, visit: <https://docs.perplexity.ai/guides/pricing>
+## Tools
 
-## Usage
+### `search` — AI-powered web search
 
-After configuring the server and restarting Claude, you can simply ask Claude to search for information. For example:
+The main search tool. Automatically selects the right model based on your query. Returns a synthesized answer with cited sources.
 
-- "What's the latest news about SpaceX?"
-- "Search for the best restaurants in Chicago"
-- "Find information about the history of jazz music"
-- "I need a deep research analysis of recent AI developments" (uses sonar-deep-research)
-- "Help me reason through this complex problem" (uses sonar-reasoning-pro)
+| Parameter | Options | Description |
+|---|---|---|
+| `query` | string | Your search query |
+| `search_context_size` | `low` / `medium` / `high` | How much web context to retrieve. `low` is fastest/cheapest (default), `high` is most thorough |
+| `reasoning_effort` | `minimal` / `low` / `medium` / `high` | Depth of reasoning for `sonar-deep-research` |
+| `strip_thinking` | boolean | Remove `<think>...</think>` blocks from reasoning model responses |
+| `search_mode` | `web` / `academic` / `sec` | `academic` prioritizes peer-reviewed papers; `sec` searches SEC filings |
+| `stream` | boolean | Enable streaming responses |
 
-Claude will automatically use the Perplexity search tool to find and return relevant information. The server will automatically select the most appropriate model based on your query's intent.
+Examples:
+- *"What's the latest on fusion energy?"* → auto-selects `sonar-pro`
+- *"Deep research analysis of CRISPR gene editing advances"* → auto-selects `sonar-deep-research`
+- *"Solve this logic puzzle step by step"* → auto-selects `sonar-reasoning-pro`
 
-If for whatever reason it decides not to use the search tool, you can force the issue by prepending your prompt with "Search the web".
+### `raw_search` — Raw ranked results (no LLM)
 
-### Intelligent Model Selection
+Returns ranked web results directly without AI synthesis. Faster and cheaper — useful for URL discovery, building source lists, or fact-checking pipelines.
 
-The server automatically selects the most appropriate Perplexity model based on your query:
+| Parameter | Options | Description |
+|---|---|---|
+| `query` | string | Search query |
+| `max_results` | 1–20 | Number of results (default: 10) |
+| `search_mode` | `web` / `academic` / `sec` | Search type |
+| `recency` | `hour` / `day` / `week` / `month` / `year` | Time window filter |
+| `search_after_date` | `MM/DD/YYYY` | Only results after this date |
+| `search_before_date` | `MM/DD/YYYY` | Only results before this date |
+| `country` | ISO 3166 code | Localize results (e.g. `US`, `GB`) |
 
-- Use research-oriented terms like "deep research," "comprehensive," or "in-depth" to trigger sonar-deep-research
-- Use reasoning terms like "solve," "figure out," or "complex problem" to trigger sonar-reasoning-pro
-- Use simple terms like "quick," "brief," or "basic" to trigger the lightweight sonar model
-- General search terms default to sonar-pro for balanced performance
+### `domain_filter` — Allowlist/blocklist domains
 
-Each search response includes information about which model was used and why.
+Restrict or exclude specific domains from search results. Filters persist across all subsequent searches until cleared.
 
-### Domain Filtering
+- `action: "allow"` — restrict results to this domain (allowlist mode)
+- `action: "block"` — exclude this domain from results (denylist mode)
+- Maximum 20 domains; cannot mix allow and block in the same filter set
 
-This server supports domain filtering to customize your search experience. You can allow or block specific domains using these commands:
+```
+"Allow results only from arxiv.org and nature.com"
+"Block pinterest.com and reddit.com from search results"
+```
 
-- **Add an allowed domain**: "Use the domain_filter tool to allow wikipedia.org"
-- **Add a blocked domain**: "Use the domain_filter tool to block pinterest.com"
-- **View current filters**: "Use the list_filters tool" (shows domain and recency filters)
-- **Clear all filters**: "Use the clear_filters tool" (clears both domain and recency filters)
+### `recency_filter` — Time window filter
 
-**Note**: Perplexity API supports up to 3 domains total with priority given to allowed domains. Domain filtering requires a Perplexity API tier that supports this feature.
+Limit search results to a specific time period. Persists until changed.
 
-Example usage flow:
-1. "Use the domain_filter tool to allow wikipedia.org"
-2. "Use the domain_filter tool to allow arxiv.org"
-3. "Use the list_filters tool" (to verify your settings)
-4. "Search for quantum computing advances" (results will prioritize wikipedia.org and arxiv.org)
+Options: `hour`, `day`, `week`, `month`, `year`, `none`
 
-### Recency Filtering
+```
+"Set recency filter to week"
+"Remove the recency filter"
+```
 
-You can limit search results to a specific time window using the recency filter:
+### `clear_filters` — Reset all filters
 
-- **Set recency filter**: "Use the recency_filter tool with filter=hour" (options: hour, day, week, month)
-- **Disable recency filter**: "Use the recency_filter tool with filter=none"
+Clears all domain and recency filters in one call.
 
-This is particularly useful for time-sensitive queries like current events or breaking news.
+### `list_filters` — View active filters
 
-### Model Selection Control
+Shows currently active domain allowlist/blocklist and recency setting.
 
-While the automatic model selection works well for most cases, you can manually control which model is used:
+### `model_info` — View or override model selection
 
-- **View model information**: "Use the model_info tool"
-- **Set a specific model**: "Use the model_info tool with model=sonar-deep-research"
-- **Return to automatic selection**: Set the model back to the default model
+View available models and current selection, or manually force a specific model.
 
-Example usage:
-1. "Use the model_info tool" (to see available models and current status)
-2. "Use the model_info tool with model=sonar-reasoning-pro" (to force using reasoning model)
-3. "Search for a mathematical proof of the Pythagorean theorem" (will use sonar-reasoning-pro)
-4. "Use the model_info tool with model=sonar-pro" (to return to automatic selection)
+```
+"Show model info"
+"Set model to sonar-deep-research"
+```
+
+## Intelligent Model Selection
+
+The server scores your query against keyword lists to automatically pick the right model:
+
+- Research keywords (`deep research`, `comprehensive`, `in-depth`) → `sonar-deep-research`
+- Reasoning keywords (`solve`, `logic`, `mathematical`, `figure out`) → `sonar-reasoning-pro`
+- Simple keywords (`quick`, `brief`, `basic`) → `sonar`
+- Everything else → `sonar-pro`
+
+Each response shows which model was used and why. If a query strongly matches a model (score ≥ 2), it will override a manually set model.
+
+## Example Workflows
+
+**Time-sensitive research with domain filtering:**
+1. `recency_filter` → `week`
+2. `domain_filter` → allow `nature.com`, allow `arxiv.org`
+3. `search` → *"Recent breakthroughs in quantum error correction"*
+
+**Financial document research:**
+1. `raw_search` with `search_mode: "sec"` → find relevant filings
+2. `search` with `search_mode: "sec"` → synthesized analysis
+
+**Academic literature review:**
+1. `search` with `search_mode: "academic"`, `search_context_size: "high"` → comprehensive results from peer-reviewed sources
+
+**Deep research with reasoning control:**
+1. `search` with `reasoning_effort: "high"`, `strip_thinking: true` → thorough analysis without `<think>` blocks in the output
 
 ## Development
 
-To modify the server:
+```bash
+npm run build   # Compile TypeScript to build/
+npm start       # Run the built server
+```
 
-1. Edit `src/index.ts`
-2. Rebuild with `npm run build`
-3. Restart Claude to load the changes
+Source is in `src/` — after editing, rebuild and restart Claude to load changes.
 
 ## License
 
