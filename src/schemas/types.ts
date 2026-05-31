@@ -8,12 +8,31 @@ export interface UserLocation {
 	latitude?: number;
 	longitude?: number;
 	country?: string;
+	city?: string;
+	region?: string;
 }
 
 export interface WebSearchOptions {
 	search_context_size?: "low" | "medium" | "high";
 	search_type?: "fast" | "pro" | "auto";
 	user_location?: UserLocation;
+	image_results_enhanced_relevance?: boolean;
+}
+
+// Structured-output request format. Mirrors the SDK Shared.ResponseFormat /
+// chat ResponseFormatJsonSchema shapes (both accept `{ type, json_schema }`).
+export interface JsonSchemaFormat {
+	// Required by the Agent API (Shared.JsonSchemaFormat); optional on chat
+	// completions. agentRespond() injects a default name when omitted.
+	name?: string;
+	schema: Record<string, unknown>;
+	description?: string;
+	strict?: boolean;
+}
+
+export interface ResponseFormat {
+	type: "json_schema";
+	json_schema: JsonSchemaFormat;
 }
 
 export interface ResponseImage {
@@ -125,12 +144,25 @@ export interface SearchArgs {
 	return_related_questions?: boolean;
 	image_domain_filter?: string[];
 	image_format_filter?: string[];
+	// Enhanced image relevance ranking (nested in web_search_options).
+	image_results_enhanced_relevance?: boolean;
 	// Location
 	country?: string;
 	latitude?: number;
 	longitude?: number;
+	city?: string;
+	region?: string;
+	// Per-call recency (overrides the stateful recency_filter for this request)
+	recency?: "hour" | "day" | "week" | "month" | "year";
+	// Sampling controls (top-level chat-completions params)
+	stop?: string | string[];
+	temperature?: number;
+	top_p?: number;
+	max_tokens?: number;
 	// Cost reporting
 	show_cost?: boolean;
+	// Structured output (JSON-schema-constrained response)
+	response_format?: ResponseFormat;
 }
 
 export interface RawSearchArgs {
@@ -146,6 +178,7 @@ export interface RawSearchArgs {
 	last_updated_after?: string;
 	last_updated_before?: string;
 	search_language_filter?: string[];
+	search_domain_filter?: string[];
 	country?: string;
 }
 
@@ -168,7 +201,35 @@ export interface AgentArgs {
 	max_steps?: number;
 	max_output_tokens?: number;
 	language_preference?: string;
-	tools?: Array<"web_search" | "fetch_url">;
+	tools?: Array<ValidAgentTool>;
+	// Nested reasoning.effort on the responses surface ('xhigh' is agent-only).
+	reasoning_effort?: "minimal" | "low" | "medium" | "high" | "xhigh";
+	// Structured output (JSON-schema-constrained response).
+	response_format?: ResponseFormat;
+	// When true, the job is queued; poll the returned id with agent_retrieve.
+	background?: boolean;
+}
+
+export interface AgentRetrieveArgs {
+	response_id: string;
+}
+
+export interface ModelListArgs {
+	// Optional client-side filter on the model's `owned_by` provider (e.g. "anthropic").
+	provider?: string;
+}
+
+// Shape of GET /v1/models (no typed SDK resource; called via client.get()).
+export interface ModelListEntry {
+	id: string;
+	object?: string;
+	created?: number;
+	owned_by?: string;
+}
+
+export interface ModelListResponse {
+	object?: string;
+	data?: ModelListEntry[];
 }
 
 export interface EmbeddingsArgs {
@@ -228,7 +289,12 @@ export interface ApiParams {
 	image_domain_filter?: string[];
 	image_format_filter?: string[];
 	stream_mode?: "full" | "concise";
+	stop?: string | string[];
+	temperature?: number;
+	top_p?: number;
+	max_tokens?: number;
 	web_search_options?: WebSearchOptions;
+	response_format?: ResponseFormat;
 	stream?: boolean;
 }
 
@@ -277,8 +343,27 @@ export const VALID_AGENT_PRESETS = [
 	"fast-search",
 	"pro-search",
 	"deep-research",
+	"advanced-deep-research",
+] as const;
+
+// Built-in tools the Agent API can invoke (SDK ResponsesCreateParams.tools).
+export const VALID_AGENT_TOOLS = [
+	"web_search",
+	"fetch_url",
+	"people_search",
+	"finance_search",
+	"sandbox",
+] as const;
+
+export const VALID_AGENT_REASONING_EFFORT = [
+	"minimal",
+	"low",
+	"medium",
+	"high",
+	"xhigh",
 ] as const;
 
 export type ValidModel = typeof VALID_MODELS[number];
 export type ValidRecencyFilter = typeof VALID_RECENCY_FILTERS[number];
 export type ValidEmbeddingModel = typeof VALID_EMBEDDING_MODELS[number];
+export type ValidAgentTool = typeof VALID_AGENT_TOOLS[number];

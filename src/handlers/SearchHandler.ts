@@ -55,7 +55,8 @@ export class SearchHandler {
 				}
 			}
 
-			// Get domain filters and recency filter
+			// Get domain filters and recency filter. A per-call args.recency
+			// overrides the stateful recency_filter for this request only.
 			const domainFilterArray = this.filterState.getDomainFilterArray();
 			const recencyFilter = this.filterState.getRecencyFilter();
 
@@ -64,7 +65,7 @@ export class SearchHandler {
 				model: selectedModel,
 				query,
 				domainFilters: domainFilterArray.length > 0 ? domainFilterArray : undefined,
-				recencyFilter: recencyFilter || undefined,
+				recencyFilter: args.recency ?? (recencyFilter || undefined),
 				args,
 			});
 

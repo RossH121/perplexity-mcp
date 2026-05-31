@@ -23,11 +23,13 @@ import { SearchHandler } from "../handlers/SearchHandler.js";
 import { RawSearchHandler } from "../handlers/RawSearchHandler.js";
 import { AsyncResearchHandler } from "../handlers/AsyncResearchHandler.js";
 import { AgentHandler } from "../handlers/AgentHandler.js";
+import { AgentRetrieveHandler } from "../handlers/AgentRetrieveHandler.js";
 import { EmbeddingsHandler } from "../handlers/EmbeddingsHandler.js";
 import { DomainFilterHandler } from "../handlers/DomainFilterHandler.js";
 import { RecencyFilterHandler } from "../handlers/RecencyFilterHandler.js";
 import { FilterManagementHandler } from "../handlers/FilterManagementHandler.js";
 import { ModelInfoHandler } from "../handlers/ModelInfoHandler.js";
+import { ModelListHandler } from "../handlers/ModelListHandler.js";
 
 import { McpRequest } from "../schemas/types.js";
 
@@ -49,11 +51,13 @@ export class PerplexityMcpServer {
 	private rawSearchHandler: RawSearchHandler;
 	private asyncResearchHandler: AsyncResearchHandler;
 	private agentHandler: AgentHandler;
+	private agentRetrieveHandler: AgentRetrieveHandler;
 	private embeddingsHandler: EmbeddingsHandler;
 	private domainFilterHandler: DomainFilterHandler;
 	private recencyFilterHandler: RecencyFilterHandler;
 	private filterManagementHandler: FilterManagementHandler;
 	private modelInfoHandler: ModelInfoHandler;
+	private modelListHandler: ModelListHandler;
 
 	constructor() {
 		// Initialize configuration
@@ -90,6 +94,7 @@ export class PerplexityMcpServer {
 		this.rawSearchHandler = new RawSearchHandler(this.apiService);
 		this.asyncResearchHandler = new AsyncResearchHandler(this.apiService);
 		this.agentHandler = new AgentHandler(this.apiService);
+		this.agentRetrieveHandler = new AgentRetrieveHandler(this.apiService);
 		this.embeddingsHandler = new EmbeddingsHandler(this.apiService);
 		this.domainFilterHandler = new DomainFilterHandler(this.filterState);
 		this.recencyFilterHandler = new RecencyFilterHandler(this.filterState);
@@ -103,6 +108,8 @@ export class PerplexityMcpServer {
 			() => this.useAutoSelection,
 			(value: boolean) => { this.useAutoSelection = value; }
 		);
+
+		this.modelListHandler = new ModelListHandler(this.apiService);
 
 		this.setupHandlers();
 		this.setupErrorHandling();
@@ -134,6 +141,8 @@ export class PerplexityMcpServer {
 					return this.asyncResearchHandler.handle(request);
 				case "agent":
 					return this.agentHandler.handle(request);
+				case "agent_retrieve":
+					return this.agentRetrieveHandler.handle(request);
 				case "embeddings":
 					return this.embeddingsHandler.handle(request);
 				case "domain_filter":
@@ -146,6 +155,8 @@ export class PerplexityMcpServer {
 					return this.filterManagementHandler.handleListFilters();
 				case "model_info":
 					return this.modelInfoHandler.handle(request);
+				case "list_models":
+					return this.modelListHandler.handle(request);
 				default:
 					throw new McpError(
 						ErrorCode.MethodNotFound,

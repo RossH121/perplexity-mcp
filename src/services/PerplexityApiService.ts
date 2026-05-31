@@ -14,6 +14,7 @@ import {
 	WebSearchOptions,
 	AgentArgs,
 	EmbeddingsArgs,
+	ModelListResponse,
 	SearchResultItem,
 	ResponseImage,
 } from "../schemas/types.js";
@@ -100,6 +101,7 @@ export class PerplexityApiService {
 		if (args.last_updated_after !== undefined) params["last_updated_after_filter"] = args.last_updated_after;
 		if (args.last_updated_before !== undefined) params["last_updated_before_filter"] = args.last_updated_before;
 		if (args.search_language_filter !== undefined) params["search_language_filter"] = args.search_language_filter;
+		if (args.search_domain_filter !== undefined) params["search_domain_filter"] = args.search_domain_filter;
 		if (args.country !== undefined) params["country"] = args.country;
 
 		const response = await (this.client.search.create as Function)(params);
@@ -141,8 +143,38 @@ export class PerplexityApiService {
 		if (args.max_output_tokens !== undefined) body["max_output_tokens"] = args.max_output_tokens;
 		if (args.language_preference !== undefined) body["language_preference"] = args.language_preference;
 		if (args.tools !== undefined) body["tools"] = args.tools.map((t) => ({ type: t }));
+		if (args.reasoning_effort !== undefined) body["reasoning"] = { effort: args.reasoning_effort };
+		if (args.response_format !== undefined) {
+			// The Agent API requires json_schema.name; inject a default when omitted.
+			const rf = args.response_format;
+			body["response_format"] = rf.json_schema.name
+				? rf
+				: { ...rf, json_schema: { ...rf.json_schema, name: "response" } };
+		}
+		if (args.background !== undefined) body["background"] = args.background;
+		// The Agent API requires at least one of model/models/preset. When the
+		// caller supplies none, default to the balanced "pro-search" preset so a
+		// bare agent({ input }) call succeeds instead of returning a 400.
+		if (!args.model && !args.models?.length && !args.preset) {
+			body["preset"] = "pro-search";
+		}
 		body["stream"] = false;
 		return (this.client.responses.create as Function)(body);
+	}
+
+	/**
+	 * Retrieves a previously-submitted agent response by id (for background runs).
+	 */
+	async getAgentResponse(responseId: string): Promise<any> {
+		return (this.client.responses.retrieve as Function)(responseId);
+	}
+
+	/**
+	 * Lists the models available to the account (GET /v1/models). The SDK has no
+	 * typed `models` resource, so this uses the generic client.get() method.
+	 */
+	async listModels(): Promise<ModelListResponse> {
+		return (this.client as any).get("/v1/models");
 	}
 
 	/**
@@ -191,11 +223,22 @@ export class PerplexityApiService {
 		const webSearchOptions: WebSearchOptions = {};
 		if (args.search_context_size) webSearchOptions.search_context_size = args.search_context_size;
 		if (args.search_type) webSearchOptions.search_type = args.search_type;
-		if (args.country !== undefined || args.latitude !== undefined || args.longitude !== undefined) {
+		if (args.image_results_enhanced_relevance !== undefined) {
+			webSearchOptions.image_results_enhanced_relevance = args.image_results_enhanced_relevance;
+		}
+		if (
+			args.country !== undefined ||
+			args.latitude !== undefined ||
+			args.longitude !== undefined ||
+			args.city !== undefined ||
+			args.region !== undefined
+		) {
 			webSearchOptions.user_location = {
 				...(args.latitude !== undefined ? { latitude: args.latitude } : {}),
 				...(args.longitude !== undefined ? { longitude: args.longitude } : {}),
 				...(args.country !== undefined ? { country: args.country } : {}),
+				...(args.city !== undefined ? { city: args.city } : {}),
+				...(args.region !== undefined ? { region: args.region } : {}),
 			};
 		}
 		if (Object.keys(webSearchOptions).length > 0) {
@@ -217,6 +260,11 @@ export class PerplexityApiService {
 		if (args.image_domain_filter !== undefined) apiParams.image_domain_filter = args.image_domain_filter;
 		if (args.image_format_filter !== undefined) apiParams.image_format_filter = args.image_format_filter;
 		if (args.stream_mode !== undefined) apiParams.stream_mode = args.stream_mode;
+		if (args.stop !== undefined) apiParams.stop = args.stop;
+		if (args.temperature !== undefined) apiParams.temperature = args.temperature;
+		if (args.top_p !== undefined) apiParams.top_p = args.top_p;
+		if (args.max_tokens !== undefined) apiParams.max_tokens = args.max_tokens;
+		if (args.response_format !== undefined) apiParams.response_format = args.response_format;
 
 		if (args.stream) apiParams.stream = true;
 

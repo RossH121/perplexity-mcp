@@ -10,14 +10,34 @@ import {
 	RawSearchArgs,
 	AsyncResearchArgs,
 	AgentArgs,
+	AgentRetrieveArgs,
+	ModelListArgs,
 	EmbeddingsArgs,
 	VALID_MODELS,
 	VALID_EMBEDDING_MODELS,
+	VALID_AGENT_TOOLS,
+	VALID_AGENT_REASONING_EFFORT,
 } from "./types.js";
 import { DEFAULT_EMBEDDING_MODEL } from "../config/constants.js";
 
 const isStringArray = (v: unknown): boolean =>
 	Array.isArray(v) && v.every((s) => typeof s === "string");
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+	typeof v === "object" && v !== null && !Array.isArray(v);
+
+// Validates the shared response_format shape: { type:'json_schema', json_schema:{ schema, name?, ... } }
+const isValidResponseFormat = (v: unknown): boolean => {
+	if (!isPlainObject(v)) return false;
+	if (v.type !== "json_schema") return false;
+	const js = v.json_schema;
+	if (!isPlainObject(js)) return false;
+	if (!isPlainObject(js.schema)) return false;
+	if (js.name !== undefined && typeof js.name !== "string") return false;
+	if (js.description !== undefined && typeof js.description !== "string") return false;
+	if (js.strict !== undefined && typeof js.strict !== "boolean") return false;
+	return true;
+};
 
 export const isValidSearchArgs = (args: unknown): args is SearchArgs => {
 	if (typeof args !== "object" || args === null) return false;
@@ -43,9 +63,18 @@ export const isValidSearchArgs = (args: unknown): args is SearchArgs => {
 	if (a.country !== undefined && typeof a.country !== "string") return false;
 	if (a.latitude !== undefined && typeof a.latitude !== "number") return false;
 	if (a.longitude !== undefined && typeof a.longitude !== "number") return false;
+	if (a.city !== undefined && typeof a.city !== "string") return false;
+	if (a.region !== undefined && typeof a.region !== "string") return false;
+	if (a.recency !== undefined && !["hour", "day", "week", "month", "year"].includes(a.recency)) return false;
+	if (a.stop !== undefined && typeof a.stop !== "string" && !isStringArray(a.stop)) return false;
+	if (a.temperature !== undefined && (typeof a.temperature !== "number" || a.temperature < 0 || a.temperature > 2)) return false;
+	if (a.top_p !== undefined && (typeof a.top_p !== "number" || a.top_p < 0 || a.top_p > 1)) return false;
+	if (a.max_tokens !== undefined && (typeof a.max_tokens !== "number" || a.max_tokens < 1)) return false;
 	if (a.search_language_filter !== undefined && !isStringArray(a.search_language_filter)) return false;
 	if (a.image_domain_filter !== undefined && !isStringArray(a.image_domain_filter)) return false;
 	if (a.image_format_filter !== undefined && !isStringArray(a.image_format_filter)) return false;
+	if (a.image_results_enhanced_relevance !== undefined && typeof a.image_results_enhanced_relevance !== "boolean") return false;
+	if (a.response_format !== undefined && !isValidResponseFormat(a.response_format)) return false;
 	return true;
 };
 
@@ -67,6 +96,7 @@ export const isValidRawSearchArgs = (args: unknown): args is RawSearchArgs => {
 	if (a.last_updated_after !== undefined && typeof a.last_updated_after !== "string") return false;
 	if (a.last_updated_before !== undefined && typeof a.last_updated_before !== "string") return false;
 	if (a.search_language_filter !== undefined && !isStringArray(a.search_language_filter)) return false;
+	if (a.search_domain_filter !== undefined && (!isStringArray(a.search_domain_filter) || (a.search_domain_filter as string[]).length > 20)) return false;
 	if (a.country !== undefined && typeof a.country !== "string") return false;
 	return true;
 };
@@ -95,7 +125,25 @@ export const isValidAgentArgs = (args: unknown): args is AgentArgs => {
 	if (a.max_steps !== undefined && (typeof a.max_steps !== "number" || a.max_steps < 1)) return false;
 	if (a.max_output_tokens !== undefined && typeof a.max_output_tokens !== "number") return false;
 	if (a.language_preference !== undefined && typeof a.language_preference !== "string") return false;
-	if (a.tools !== undefined && (!Array.isArray(a.tools) || !a.tools.every((t) => ["web_search", "fetch_url"].includes(t)))) return false;
+	if (a.tools !== undefined && (!Array.isArray(a.tools) || !a.tools.every((t) => (VALID_AGENT_TOOLS as readonly string[]).includes(t)))) return false;
+	if (a.reasoning_effort !== undefined && !(VALID_AGENT_REASONING_EFFORT as readonly string[]).includes(a.reasoning_effort)) return false;
+	if (a.response_format !== undefined && !isValidResponseFormat(a.response_format)) return false;
+	if (a.background !== undefined && typeof a.background !== "boolean") return false;
+	return true;
+};
+
+export const isValidAgentRetrieveArgs = (args: unknown): args is AgentRetrieveArgs =>
+	typeof args === "object" &&
+	args !== null &&
+	typeof (args as AgentRetrieveArgs).response_id === "string" &&
+	(args as AgentRetrieveArgs).response_id.trim().length > 0;
+
+// list_models takes no required args; `provider` is an optional string filter.
+export const isValidModelListArgs = (args: unknown): args is ModelListArgs => {
+	if (args === undefined || args === null) return true;
+	if (typeof args !== "object") return false;
+	const a = args as ModelListArgs;
+	if (a.provider !== undefined && typeof a.provider !== "string") return false;
 	return true;
 };
 

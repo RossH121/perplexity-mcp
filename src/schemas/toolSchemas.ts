@@ -2,7 +2,43 @@
  * MCP tool schemas for the Perplexity server
  */
 
-import { VALID_MODELS, VALID_EMBEDDING_MODELS, VALID_AGENT_PRESETS } from "./types.js";
+import {
+	VALID_MODELS,
+	VALID_EMBEDDING_MODELS,
+	VALID_AGENT_PRESETS,
+	VALID_AGENT_TOOLS,
+	VALID_AGENT_REASONING_EFFORT,
+} from "./types.js";
+
+// Reusable JSON-schema structured-output param, shared by `search` and `agent`.
+const RESPONSE_FORMAT_SCHEMA = {
+	type: "object",
+	description:
+		"Constrain the model's output to a JSON schema. The response text becomes a JSON object matching the schema. Note: search results/citations are still returned alongside.",
+	properties: {
+		type: { type: "string", enum: ["json_schema"] },
+		json_schema: {
+			type: "object",
+			properties: {
+				name: {
+					type: "string",
+					description: "Schema name (1-64 alphanumeric chars). Required by the agent tool; defaults to 'response' if omitted.",
+				},
+				schema: {
+					type: "object",
+					description: "A JSON Schema object describing the desired output shape.",
+				},
+				description: { type: "string" },
+				strict: {
+					type: "boolean",
+					description: "Enforce strict schema validation.",
+				},
+			},
+			required: ["schema"],
+		},
+	},
+	required: ["type", "json_schema"],
+} as const;
 
 export const TOOL_SCHEMAS = [
 	{
@@ -99,6 +135,10 @@ export const TOOL_SCHEMAS = [
 					items: { type: "string" },
 					description: "Restrict returned images to these formats, e.g. ['png','jpg'] (requires return_images).",
 				},
+				image_results_enhanced_relevance: {
+					type: "boolean",
+					description: "Enable enhanced relevance ranking for returned images (nested in web_search_options; pairs with return_images).",
+				},
 				country: {
 					type: "string",
 					description: "Localize search to a country. ISO 3166-1 alpha-2 code (e.g. 'US', 'GB'). Sent as web_search_options.user_location.country.",
@@ -111,10 +151,43 @@ export const TOOL_SCHEMAS = [
 					type: "number",
 					description: "Approximate user longitude for localized results (sent with country in user_location).",
 				},
+				city: {
+					type: "string",
+					description: "User city for localized results (sent in web_search_options.user_location).",
+				},
+				region: {
+					type: "string",
+					description: "User region/state for localized results (sent in web_search_options.user_location).",
+				},
+				recency: {
+					type: "string",
+					enum: ["hour", "day", "week", "month", "year"],
+					description: "Restrict sources to a time window for this request only. Overrides the stateful recency_filter without mutating it.",
+				},
+				stop: {
+					oneOf: [
+						{ type: "string" },
+						{ type: "array", items: { type: "string" } },
+					],
+					description: "Stop sequence(s). Generation halts when any is produced.",
+				},
+				temperature: {
+					type: "number",
+					description: "Sampling temperature, 0-2. Lower is more deterministic (default ~0.2).",
+				},
+				top_p: {
+					type: "number",
+					description: "Nucleus sampling probability mass, 0-1. Alternative to temperature.",
+				},
+				max_tokens: {
+					type: "number",
+					description: "Maximum number of tokens to generate in the completion.",
+				},
 				show_cost: {
 					type: "boolean",
 					description: "Append a one-line request-cost footer from usage.cost when the API returns it (default: false).",
 				},
+				response_format: RESPONSE_FORMAT_SCHEMA,
 			},
 			required: ["query"],
 		},
@@ -180,6 +253,11 @@ export const TOOL_SCHEMAS = [
 					items: { type: "string" },
 					description: "Restrict results to these languages. ISO 639-1 codes.",
 				},
+				search_domain_filter: {
+					type: "array",
+					items: { type: "string" },
+					description: "Restrict results to (or exclude, with a leading '-') these domains. Max 20. E.g. ['wikipedia.org','-pinterest.com'].",
+				},
 				country: {
 					type: "string",
 					description: "Localize results to a country. ISO 3166-1 alpha-2 code (e.g. 'US', 'GB', 'DE').",
@@ -232,7 +310,7 @@ export const TOOL_SCHEMAS = [
 	},
 	{
 		name: "agent",
-		description: "Perplexity Agent API: an agentic loop that can call built-in tools (web_search, fetch_url) and run third-party models. Use for multi-step tasks that need tool use or a specific external model. Distinct from 'search' (single grounded answer).",
+		description: "Perplexity Agent API: an agentic loop that can call built-in tools (web_search, fetch_url, people_search, finance_search, sandbox/code-execution) and run third-party models. Use for multi-step tasks that need tool use or a specific external model. Distinct from 'search' (single grounded answer). Pick a 'model', a 'models' chain, or a 'preset'; if you specify none, the 'pro-search' preset is used by default. For long-running work, set background:true and poll the returned id with agent_retrieve.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -252,7 +330,7 @@ export const TOOL_SCHEMAS = [
 				preset: {
 					type: "string",
 					enum: VALID_AGENT_PRESETS,
-					description: "Named preset instead of a specific model: 'fast-search', 'pro-search', or 'deep-research'.",
+					description: "Named preset instead of a specific model: 'fast-search', 'pro-search', 'deep-research', or 'advanced-deep-research' (institutional-grade research). Used as the default ('pro-search') when no model/models/preset is supplied.",
 				},
 				instructions: {
 					type: "string",
@@ -272,11 +350,35 @@ export const TOOL_SCHEMAS = [
 				},
 				tools: {
 					type: "array",
-					items: { type: "string", enum: ["web_search", "fetch_url"] },
-					description: "Built-in tools the agent may use: 'web_search', 'fetch_url'.",
+					items: { type: "string", enum: VALID_AGENT_TOOLS },
+					description: "Built-in tools the agent may use. 'web_search': grounded web search. 'fetch_url': retrieve specific URLs. 'people_search': search for people. 'finance_search': structured financial data (quotes, financials, earnings transcripts). 'sandbox': execute code in an isolated container.",
+				},
+				reasoning_effort: {
+					type: "string",
+					enum: VALID_AGENT_REASONING_EFFORT,
+					description: "How much effort the agent spends on reasoning. 'minimal'/'low': faster. 'medium': balanced. 'high'/'xhigh': most thorough ('xhigh' is agent-only).",
+				},
+				response_format: RESPONSE_FORMAT_SCHEMA,
+				background: {
+					type: "boolean",
+					description: "When true, the run is queued and returns immediately with a response id and status. Poll the id with agent_retrieve until status is 'completed'. Use for long deep-research runs.",
 				},
 			},
 			required: ["input"],
+		},
+	},
+	{
+		name: "agent_retrieve",
+		description: "Retrieve the result of a background Agent API run (one submitted with agent + background:true). Returns the current status and, once complete, the full output. Poll until status is 'completed'.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				response_id: {
+					type: "string",
+					description: "The response id returned by a prior agent call with background:true.",
+				},
+			},
+			required: ["response_id"],
 		},
 	},
 	{
@@ -369,6 +471,19 @@ export const TOOL_SCHEMAS = [
 					type: "string",
 					enum: VALID_MODELS,
 					description: "Optional: Override auto-selection. 'sonar-deep-research' for comprehensive analysis, 'sonar-reasoning-pro' for complex logic and chain-of-thought, 'sonar-pro' for general search, 'sonar' for quick lookups",
+				},
+			},
+		},
+	},
+	{
+		name: "list_models",
+		description: "List the models currently available to your account via the live GET /v1/models endpoint (dynamic discovery), grouped by provider. Returns Sonar models plus any provider-qualified third-party models usable through the 'agent' tool (e.g. 'anthropic/claude-sonnet-4-6', 'openai/gpt-4.1'). Distinct from 'model_info', which manages the stateful Sonar model used by 'search'.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				provider: {
+					type: "string",
+					description: "Optional: only return models from this provider (matched against each model's 'owned_by', e.g. 'anthropic', 'openai', 'perplexity').",
 				},
 			},
 		},
