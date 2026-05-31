@@ -62,8 +62,11 @@ export const API_CONFIG = {
 	MAX_DOMAINS: 20,
 } as const;
 
+// Default embedding model
+export const DEFAULT_EMBEDDING_MODEL = "pplx-embed-v1-0.6b" as const;
+
 // Server Configuration
 export const SERVER_CONFIG = {
 	name: "perplexity-search-server",
-	version: "0.1.0",
+	version: "0.2.0",
 } as const;

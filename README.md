@@ -1,6 +1,6 @@
 # Perplexity MCP Server
 
-An MCP server that provides Perplexity AI web search capabilities to Claude, with automatic model selection, stateful filters, and 7 purpose-built tools.
+An MCP server that provides Perplexity AI web search capabilities to Claude, with automatic model selection, stateful filters, and 10 purpose-built tools.
 
 <a href="https://glama.ai/mcp/servers/6qmvjay9z5">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/6qmvjay9z5/badge" alt="Perplexity Server MCP server" />
@@ -77,9 +77,22 @@ The main search tool. Automatically selects the right model based on your query.
 |---|---|---|
 | `query` | string | Your search query |
 | `search_context_size` | `low` / `medium` / `high` | How much web context to retrieve. `low` is fastest/cheapest (default), `high` is most thorough |
+| `search_type` | `fast` / `pro` / `auto` | Search engine tier (nested in `web_search_options`) |
 | `reasoning_effort` | `minimal` / `low` / `medium` / `high` | Depth of reasoning for `sonar-deep-research` |
 | `strip_thinking` | boolean | Remove `<think>...</think>` blocks from reasoning model responses |
 | `search_mode` | `web` / `academic` / `sec` | `academic` prioritizes peer-reviewed papers; `sec` searches SEC filings |
+| `search_after_date` / `search_before_date` | `MM/DD/YYYY` | Filter sources by publication date |
+| `last_updated_after` / `last_updated_before` | `MM/DD/YYYY` | Filter sources by last-updated date |
+| `search_language_filter` | `["en","de"]` | Restrict sources to languages (ISO 639-1) |
+| `language_preference` | ISO 639-1 | Preferred response language |
+| `disable_search` | boolean | Answer from training data only (no web search) |
+| `enable_search_classifier` | boolean | Let a classifier decide whether to search |
+| `return_images` | boolean | Append an Images section of result URLs |
+| `image_domain_filter` / `image_format_filter` | string[] | Restrict images by domain or format |
+| `return_related_questions` | boolean | Append follow-up question suggestions |
+| `country` / `latitude` / `longitude` | — | Localize results via `user_location` |
+| `stream_mode` | `full` / `concise` | Streaming event format for Pro Search |
+| `show_cost` | boolean | Append a request-cost footer when available |
 | `stream` | boolean | Enable streaming responses |
 
 Examples:
@@ -93,13 +106,64 @@ Returns ranked web results directly without AI synthesis. Faster and cheaper —
 
 | Parameter | Options | Description |
 |---|---|---|
-| `query` | string | Search query |
+| `query` | string or string[] | Search query, or an array of queries run in one request |
 | `max_results` | 1–20 | Number of results (default: 10) |
-| `search_mode` | `web` / `academic` / `sec` | Search type |
+| `max_tokens` / `max_tokens_per_page` | number | Token budget overall / per result |
+| `search_mode` | `web` / `academic` / `sec` | Source category |
+| `search_type` | `web` / `people` | `people` routes to People Search |
 | `recency` | `hour` / `day` / `week` / `month` / `year` | Time window filter |
-| `search_after_date` | `MM/DD/YYYY` | Only results after this date |
-| `search_before_date` | `MM/DD/YYYY` | Only results before this date |
+| `search_after_date` / `search_before_date` | `MM/DD/YYYY` | Filter by publication date |
+| `last_updated_after` / `last_updated_before` | `MM/DD/YYYY` | Filter by last-updated date |
+| `search_language_filter` | `["en","de"]` | Restrict to languages (ISO 639-1) |
 | `country` | ISO 3166 code | Localize results (e.g. `US`, `GB`) |
+
+> Note: prior versions sent these params in camelCase, which the Search API silently ignored — so `max_results`, `recency`, `search_mode` and the date filters had no effect. This is fixed; they now take effect.
+
+### `async_research` — Long-running deep research
+
+Submit a `sonar-deep-research` job and poll it, instead of blocking on a synchronous call. Useful when research may exceed the 5-minute synchronous timeout. Jobs expire 7 days after creation.
+
+| Parameter | Options | Description |
+|---|---|---|
+| `action` | `submit` / `status` / `list` | What to do |
+| `query` | string | Research question (required for `submit`) |
+| `request_id` | string | Job id from a prior `submit` (required for `status`) |
+| `model` | Sonar model | Job model (default: `sonar-deep-research`) |
+| `reasoning_effort` | `minimal` / `low` / `medium` / `high` | Reasoning depth |
+| `search_mode` | `web` / `academic` / `sec` | Source category |
+| `strip_thinking` | boolean | Strip `<think>` blocks from the completed result |
+
+```
+"Submit async research: comprehensive comparison of solid-state battery startups"
+→ returns a request_id
+"Check async research status for <request_id>"
+```
+
+### `agent` — Agentic loop with built-in tools
+
+The Perplexity Agent API. Runs a multi-step agent that can call built-in tools and optionally a third-party model.
+
+| Parameter | Options | Description |
+|---|---|---|
+| `input` | string | The task or question |
+| `model` | e.g. `openai/gpt-4.1` | Provider-qualified model |
+| `models` | string[] | Fallback chain (takes precedence over `model`) |
+| `preset` | `fast-search` / `pro-search` / `deep-research` | Named preset instead of a model |
+| `instructions` | string | System prompt |
+| `max_steps` | 1–10 | Max agentic/tool steps |
+| `max_output_tokens` | number | Max output tokens |
+| `tools` | `web_search` / `fetch_url` | Built-in tools the agent may use |
+
+### `embeddings` — Text embeddings
+
+Generate embeddings via the Perplexity Embeddings API. Returns a compact summary (model, vector count, token usage) by default.
+
+| Parameter | Options | Description |
+|---|---|---|
+| `input` | string or string[] | Text(s) to embed (max 512) |
+| `model` | `pplx-embed-v1-0.6b` / `pplx-embed-v1-4b` | Embedding model (default: 0.6b) |
+| `dimensions` | number | Output dimensions (Matryoshka) |
+| `full` | boolean | Include raw base64-encoded vectors |
 
 ### `domain_filter` — Allowlist/blocklist domains
 

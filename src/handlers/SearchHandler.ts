@@ -8,11 +8,12 @@ import { PerplexityApiService } from "../services/PerplexityApiService.js";
 import { ModelSelectionService } from "../services/ModelSelectionService.js";
 import { FilterState } from "../models/FilterState.js";
 import { ErrorHandler } from "../utils/errorHandling.js";
+import {
+	stripThinkingBlocks,
+	normalizeMessageContent,
+	renderResponseExtras,
+} from "../utils/responseFormatting.js";
 import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
-
-function stripThinkingBlocks(text: string): string {
-	return text.replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim();
-}
 
 export class SearchHandler {
 	constructor(
@@ -31,14 +32,8 @@ export class SearchHandler {
 			);
 		}
 
-		const {
-			query,
-			stream = false,
-			search_context_size,
-			reasoning_effort,
-			strip_thinking,
-			search_mode,
-		} = request.params.arguments as SearchArgs;
+		const args = request.params.arguments as SearchArgs;
+		const { query, stream = false, strip_thinking, show_cost } = args;
 
 		try {
 			// Get model selection based on intent
@@ -64,17 +59,14 @@ export class SearchHandler {
 			const domainFilterArray = this.filterState.getDomainFilterArray();
 			const recencyFilter = this.filterState.getRecencyFilter();
 
-			// Create API parameters (includes new params)
-			const apiParams = this.apiService.createApiParams(
-				selectedModel,
+			// Create API parameters (includes all new params)
+			const apiParams = this.apiService.createApiParams({
+				model: selectedModel,
 				query,
-				domainFilterArray.length > 0 ? domainFilterArray : undefined,
-				recencyFilter || undefined,
-				stream,
-				search_context_size,
-				reasoning_effort,
-				search_mode,
-			);
+				domainFilters: domainFilterArray.length > 0 ? domainFilterArray : undefined,
+				recencyFilter: recencyFilter || undefined,
+				args,
+			});
 
 			const modelInfo = `[Using model: ${selectedModel} - ${description}]\n\n`;
 
@@ -87,14 +79,7 @@ export class SearchHandler {
 				}
 
 				let responseText = modelInfo + content;
-
-				if (streamResult.search_results && streamResult.search_results.length > 0) {
-					responseText += "\n\n## Sources\n";
-					streamResult.search_results.forEach((result, index) => {
-						const dateInfo = result.date ? ` (${result.date})` : "";
-						responseText += `[${index + 1}] ${result.title}${dateInfo}\n${result.url}\n\n`;
-					});
-				}
+				responseText += renderResponseExtras(streamResult, !!show_cost);
 
 				return {
 					content: [{ type: "text", text: responseText }],
@@ -103,21 +88,14 @@ export class SearchHandler {
 				const response = await this.apiService.search(apiParams);
 
 				if (response.choices && response.choices.length > 0) {
-					let content = response.choices[0].message.content;
+					let content = normalizeMessageContent(response.choices[0].message.content);
 
 					if (strip_thinking) {
 						content = stripThinkingBlocks(content);
 					}
 
 					let responseText = modelInfo + content;
-
-					if (response.search_results && response.search_results.length > 0) {
-						responseText += "\n\n## Sources\n";
-						response.search_results.forEach((result, index) => {
-							const dateInfo = result.date ? ` (${result.date})` : "";
-							responseText += `[${index + 1}] ${result.title}${dateInfo}\n${result.url}\n\n`;
-						});
-					}
+					responseText += renderResponseExtras(response, !!show_cost);
 
 					return {
 						content: [{ type: "text", text: responseText }],

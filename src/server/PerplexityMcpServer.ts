@@ -21,6 +21,9 @@ import { FilterState } from "../models/FilterState.js";
 // Handlers
 import { SearchHandler } from "../handlers/SearchHandler.js";
 import { RawSearchHandler } from "../handlers/RawSearchHandler.js";
+import { AsyncResearchHandler } from "../handlers/AsyncResearchHandler.js";
+import { AgentHandler } from "../handlers/AgentHandler.js";
+import { EmbeddingsHandler } from "../handlers/EmbeddingsHandler.js";
 import { DomainFilterHandler } from "../handlers/DomainFilterHandler.js";
 import { RecencyFilterHandler } from "../handlers/RecencyFilterHandler.js";
 import { FilterManagementHandler } from "../handlers/FilterManagementHandler.js";
@@ -44,6 +47,9 @@ export class PerplexityMcpServer {
 	// Handlers
 	private searchHandler: SearchHandler;
 	private rawSearchHandler: RawSearchHandler;
+	private asyncResearchHandler: AsyncResearchHandler;
+	private agentHandler: AgentHandler;
+	private embeddingsHandler: EmbeddingsHandler;
 	private domainFilterHandler: DomainFilterHandler;
 	private recencyFilterHandler: RecencyFilterHandler;
 	private filterManagementHandler: FilterManagementHandler;
@@ -82,6 +88,9 @@ export class PerplexityMcpServer {
 		);
 		
 		this.rawSearchHandler = new RawSearchHandler(this.apiService);
+		this.asyncResearchHandler = new AsyncResearchHandler(this.apiService);
+		this.agentHandler = new AgentHandler(this.apiService);
+		this.embeddingsHandler = new EmbeddingsHandler(this.apiService);
 		this.domainFilterHandler = new DomainFilterHandler(this.filterState);
 		this.recencyFilterHandler = new RecencyFilterHandler(this.filterState);
 		this.filterManagementHandler = new FilterManagementHandler(this.filterState);
@@ -121,6 +130,12 @@ export class PerplexityMcpServer {
 					return this.searchHandler.handle(request);
 				case "raw_search":
 					return this.rawSearchHandler.handle(request);
+				case "async_research":
+					return this.asyncResearchHandler.handle(request);
+				case "agent":
+					return this.agentHandler.handle(request);
+				case "embeddings":
+					return this.embeddingsHandler.handle(request);
 				case "domain_filter":
 					return this.domainFilterHandler.handle(request);
 				case "recency_filter":

@@ -30,7 +30,8 @@ export class RawSearchHandler {
 				};
 			}
 
-			const lines: string[] = [`## Search Results for: "${args.query}"\n`];
+			const queryLabel = Array.isArray(args.query) ? args.query.join('", "') : args.query;
+			const lines: string[] = [`## Search Results for: "${queryLabel}"\n`];
 
 			results.forEach((result, index) => {
 				lines.push(`### [${index + 1}] ${result.title}`);
