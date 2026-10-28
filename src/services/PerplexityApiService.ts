@@ -21,13 +21,27 @@ import {
 import { API_CONFIG, DEFAULT_EMBEDDING_MODEL } from "../config/constants.js";
 import { EnvironmentConfig } from "../config/environment.js";
 
+// Identifies this MCP server to Perplexity; only sent to the public API host.
+const INTEGRATION_HEADERS = { "X-Pplx-Integration": "perplexity-mcp" };
+
+function isPerplexityApiHost(baseURL: string): boolean {
+	try {
+		return new URL(baseURL).hostname === "api.perplexity.ai";
+	} catch {
+		return false;
+	}
+}
+
 export class PerplexityApiService {
 	private client: Perplexity;
 
 	constructor(private config: EnvironmentConfig) {
+		// Same resolution as the SDK: PERPLEXITY_BASE_URL, else the public API.
+		const baseURL = process.env.PERPLEXITY_BASE_URL?.trim() || API_CONFIG.BASE_URL;
 		this.client = new Perplexity({
 			apiKey: this.config.apiKey,
 			timeout: API_CONFIG.TIMEOUT,
+			defaultHeaders: isPerplexityApiHost(baseURL) ? INTEGRATION_HEADERS : undefined,
 		});
 	}
 
