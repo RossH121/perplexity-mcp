@@ -6,7 +6,10 @@
   "main": "build/index.js",
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
-    "start": "node build/index.js"
+    "start": "node build/index.js",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "mcpb:manifest": "node scripts/gen-mcpb-manifest.mjs",
+    "pack:mcpb": "node scripts/pack-mcpb.mjs"
   },
   "keywords": [
     "mcp",
@@ -17,11 +20,16 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.17.5",
-    "@perplexity-ai/perplexity_ai": "^0.31.0"
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@perplexity-ai/perplexity_ai": "^0.41.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
     "@types/node": "^24.3.1",
     "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

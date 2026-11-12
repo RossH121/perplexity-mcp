@@ -4,20 +4,18 @@
  * tool so a completed job looks identical whether it ran inline or queued.
  */
 
-import { McpRequest, AgentRetrieveArgs } from "../schemas/types.js";
+import { McpRequest, HandlerContext, AgentRetrieveArgs } from "../schemas/types.js";
 import { isValidAgentRetrieveArgs } from "../schemas/validation.js";
 import { PerplexityApiService } from "../services/PerplexityApiService.js";
 import { ErrorHandler } from "../utils/errorHandling.js";
-import { renderAgentResponse } from "./AgentHandler.js";
-import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import { agentResult } from "./AgentHandler.js";
 
 export class AgentRetrieveHandler {
 	constructor(private apiService: PerplexityApiService) {}
 
-	async handle(request: McpRequest) {
+	async handle(request: McpRequest, ctx: HandlerContext = {}) {
 		if (!isValidAgentRetrieveArgs(request.params.arguments)) {
-			throw ErrorHandler.createMcpError(
-				ErrorCode.InvalidParams,
+			throw ErrorHandler.validationError(
 				"Invalid agent_retrieve arguments. 'response_id' must be a non-empty string."
 			);
 		}
@@ -25,8 +23,8 @@ export class AgentRetrieveHandler {
 		const args = request.params.arguments as AgentRetrieveArgs;
 
 		try {
-			const resp = await this.apiService.getAgentResponse(args.response_id);
-			return { content: [{ type: "text", text: renderAgentResponse(resp) }] };
+			const resp = await this.apiService.getAgentResponse(args.response_id, ctx);
+			return agentResult(resp);
 		} catch (error) {
 			return ErrorHandler.handleApiError(error);
 		}

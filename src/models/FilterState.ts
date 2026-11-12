@@ -146,4 +146,14 @@ export class FilterState {
 	getRecencyFilter(): string | null {
 		return this.recencyFilter;
 	}
+
+	/** Structured view for list_filters' structuredContent. */
+	snapshot() {
+		return {
+			allowed_domains: [...this.domainFilters.allowedDomains],
+			blocked_domains: [...this.domainFilters.blockedDomains],
+			recency: this.recencyFilter,
+			max_domains: API_CONFIG.MAX_DOMAINS,
+		};
+	}
 }

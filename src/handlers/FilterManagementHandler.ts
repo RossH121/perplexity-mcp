@@ -3,6 +3,7 @@
  */
 
 import { FilterState } from "../models/FilterState.js";
+import { structuredResult } from "../utils/structuredResult.js";
 
 export class FilterManagementHandler {
 	constructor(private filterState: FilterState) {}
@@ -21,15 +22,6 @@ export class FilterManagementHandler {
 	}
 
 	async handleListFilters() {
-		const statusMessage = this.filterState.getFilterStatus();
-
-		return {
-			content: [
-				{
-					type: "text",
-					text: statusMessage,
-				},
-			],
-		};
+		return structuredResult(this.filterState.getFilterStatus(), this.filterState.snapshot());
 	}
 }

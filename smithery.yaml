@@ -15,7 +15,7 @@ startCommand:
         type: string
         default: sonar
         description: "The model to use for the Perplexity API. Valid options:
-          sonar-reasoning-pro, sonar-reasoning, sonar-pro, sonar."
+          sonar, sonar-pro, sonar-reasoning-pro, sonar-deep-research (mapped to Agent API effort levels by default)."
   commandFunction:
     # A function that produces the CLI command to start the MCP on stdio.
     |-

@@ -2,3 +2,5 @@ node_modules/
 build/
 .DS_Store
 *.log
+# MCPB bundle output (scripts/pack-mcpb.mjs)
+dist/
