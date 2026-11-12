@@ -1,0 +1,4 @@
+- [Perplexity Node SDK lookup after 0.38.0 restructure](perplexity_node_sdk_lookup.md), where generated types actually live now, and how to extract from the giant file without missing fields
+- [Claude Code MCP docs lookup](claude_code_mcp_docs_lookup.md), the anthropic/* _meta keys and limits page, how to read it, and the MCP SDK v1/v2 split trap
+- [Perplexity docs research traps](perplexity_docs_research_traps.md), changelog missed the Sonar retirement; grepping oversized scrapes; live-probe via own MCP tools
+- [Perplexity changelog/API-ref extraction](perplexity_changelog_extraction.md), WebFetch month-scoped prompts on .md pages, map once for new products, cheap agent probes; /v1/models lags retirements

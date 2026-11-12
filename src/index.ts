@@ -8,6 +8,16 @@
  */
 
 import { PerplexityMcpServer } from "./server/PerplexityMcpServer.js";
+import { logError } from "./utils/logger.js";
 
-const server = new PerplexityMcpServer();
-server.run().catch(() => process.exit(1));
+try {
+	const server = new PerplexityMcpServer();
+	server.run().catch((error) => {
+		logError("Failed to start", error);
+		process.exit(1);
+	});
+} catch (error) {
+	// e.g. missing PERPLEXITY_API_KEY. stderr only; stdout is the MCP channel.
+	logError("Failed to start", error);
+	process.exit(1);
+}

@@ -1,0 +1,28 @@
+# Extra exclusions for `mcpb pack` (gitignore syntax; added on top of the CLI's
+# built-in list: .git, *.map, *.d.ts, package-lock.json, tsconfig.json, ...).
+# scripts/pack-mcpb.mjs packs from an allowlisted staging dir with a clean
+# production install, so most of these only matter if someone runs
+# `mcpb pack .` from the repo root by mistake.
+
+# Repo-only sources and tooling
+/src/
+/test/
+/scripts/
+/.claude/
+/.github/
+/dist/
+/Dockerfile
+/smithery.yaml
+/CLAUDE.md
+/.mcp.json
+
+# TypeScript sources shipped inside dependencies (Node never loads them)
+*.ts
+*.mts
+*.cts
+
+# Dependency docs and metadata not needed at runtime
+node_modules/**/README*
+node_modules/**/CHANGELOG*
+node_modules/**/HISTORY*
+node_modules/**/*.md

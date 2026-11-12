@@ -2,19 +2,17 @@
  * Handler for domain filter tool functionality
  */
 
-import { McpRequest, DomainArgs } from "../schemas/types.js";
+import { McpRequest, HandlerContext, DomainArgs } from "../schemas/types.js";
 import { isValidDomainArgs } from "../schemas/validation.js";
 import { FilterState } from "../models/FilterState.js";
 import { ErrorHandler } from "../utils/errorHandling.js";
-import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 
 export class DomainFilterHandler {
 	constructor(private filterState: FilterState) {}
 
-	async handle(request: McpRequest) {
+	async handle(request: McpRequest, ctx: HandlerContext = {}) {
 		if (!isValidDomainArgs(request.params.arguments)) {
-			throw ErrorHandler.createMcpError(
-				ErrorCode.InvalidParams,
+			throw ErrorHandler.validationError(
 				'Invalid domain filter arguments. Domain must be a non-empty string and action must be "allow" or "block".'
 			);
 		}

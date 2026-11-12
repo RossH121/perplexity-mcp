@@ -2,19 +2,17 @@
  * Handler for recency filter tool functionality
  */
 
-import { McpRequest, RecencyArgs } from "../schemas/types.js";
+import { McpRequest, HandlerContext, RecencyArgs } from "../schemas/types.js";
 import { isValidRecencyArgs } from "../schemas/validation.js";
 import { FilterState } from "../models/FilterState.js";
 import { ErrorHandler } from "../utils/errorHandling.js";
-import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 
 export class RecencyFilterHandler {
 	constructor(private filterState: FilterState) {}
 
-	async handle(request: McpRequest) {
+	async handle(request: McpRequest, ctx: HandlerContext = {}) {
 		if (!isValidRecencyArgs(request.params.arguments)) {
-			throw ErrorHandler.createMcpError(
-				ErrorCode.InvalidParams,
+			throw ErrorHandler.validationError(
 				"Invalid recency filter argument. Filter must be one of: hour, day, week, month, none."
 			);
 		}

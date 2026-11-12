@@ -1,0 +1,171 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "perplexity-mcp",
+  "display_name": "Perplexity Search (unofficial MCP server)",
+  "version": "1.0.0",
+  "description": "Web search, deep research, agent runs and embeddings via the Perplexity API. Community project, not affiliated with Perplexity.",
+  "long_description": "A local stdio MCP server that wraps the Perplexity API: synthesized web search, raw ranked search, async deep research, the Agent API (built-in tools, background runs, sandbox files), embeddings and the Decisions API. Requires your own Perplexity API key, which is stored in the OS keychain. Community project, not affiliated with or endorsed by Perplexity AI.",
+  "author": {
+    "name": "perplexity-mcp contributors",
+    "url": "https://github.com/RossH121/perplexity-mcp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RossH121/perplexity-mcp.git"
+  },
+  "homepage": "https://github.com/RossH121/perplexity-mcp",
+  "support": "https://github.com/RossH121/perplexity-mcp/issues",
+  "license": "MIT",
+  "keywords": [
+    "search",
+    "web-search",
+    "research",
+    "agent",
+    "embeddings"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "build/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/build/index.js"
+      ],
+      "env": {
+        "PERPLEXITY_API_KEY": "${user_config.api_key}",
+        "PERPLEXITY_MODEL": "${user_config.default_model}",
+        "PERPLEXITY_SEARCH_BACKEND": "${user_config.search_backend}",
+        "PERPLEXITY_MCP_DEBUG": "${user_config.debug}"
+      }
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "Perplexity API key",
+      "description": "Your Perplexity API key (pplx-...). Stored in the OS keychain.",
+      "sensitive": true,
+      "required": true
+    },
+    "default_model": {
+      "type": "string",
+      "title": "Default Sonar model",
+      "description": "Default model for the search tool's Sonar path: sonar, sonar-pro, sonar-reasoning-pro or sonar-deep-research. An invalid value stops the server from starting.",
+      "default": "sonar-pro"
+    },
+    "search_backend": {
+      "type": "string",
+      "title": "Search backend",
+      "description": "Backend for search and async research: 'agent' (Agent API, default) or 'sonar' (legacy Sonar chat completions). Any other value falls back to 'agent'.",
+      "default": "agent"
+    },
+    "debug": {
+      "type": "string",
+      "title": "Debug logging",
+      "description": "Set to 1 to write verbose diagnostics to the server's stderr log. Leave empty to disable.",
+      "default": ""
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=20"
+    }
+  },
+  "tools_generated": false,
+  "tools": [
+    {
+      "name": "search",
+      "description": "Web search via Perplexity AI with automatic model selection. Returns an AI-synthesized answer with cited sources. The search uses only the query text (not conversation history). Best for: current events, factual research, technical documentation, comparative analysis. Runs on the Perplexity Agent API (Sonar Chat Completions reached end of support on 2026-09-27): the routed Sonar model maps to an Agent effort level (sonar and sonar-pro -> fast, sonar-reasoning-pro -> low, sonar-deep-research -> high). A few Sonar-only params have no Agent equivalent; they are ignored and listed under 'Backend notes' in the result. PERPLEXITY_SEARCH_BACKEND=sonar switches back to the legacy Sonar path."
+    },
+    {
+      "name": "raw_search",
+      "description": "Direct web search returning ranked results without LLM synthesis. Faster and cheaper than 'search', use when you need source URLs, titles, and snippets without an AI-generated response. Good for: URL discovery, fact-checking pipelines, building source lists. Supports multi-query (pass an array of up to 5 queries in one request; each query counts separately against the rate limit). To narrow to a corpus (academic, SEC filings) use search_domain_filter, e.g. ['arxiv.org','pubmed.ncbi.nlm.nih.gov'] or ['sec.gov','edgar.sec.gov'], this endpoint has no search_mode (that is a 'search'-tool/Sonar feature)."
+    },
+    {
+      "name": "async_research_submit",
+      "description": "Start a long-running research job and return its id immediately (creates a billed job). Runs as a Perplexity Agent API background run; the Sonar model picks the effort level (default sonar-deep-research -> high). Poll with async_research_status until it completes. The id (resp_...) also works with agent_retrieve, and agent_cancel can stop it. For full control of the run (tools, models, structured output) use 'agent' with background:true instead."
+    },
+    {
+      "name": "async_research_status",
+      "description": "Check a research job started with async_research_submit, and return its report once it completes. Read-only: polling changes nothing. Returns 'not ready yet' while queued or in progress. Agent ids (resp_...) are fetched from the Agent API; bare-UUID ids from the old async Sonar API are polled through the legacy endpoint for as long as it answers."
+    },
+    {
+      "name": "async_research_list",
+      "description": "List research job ids submitted through this server process (with last known status), plus any jobs from the legacy async Sonar API. The Agent API has no list endpoint, so this registry lives in memory and is lost when the server restarts: keep the ids you need. Read-only."
+    },
+    {
+      "name": "async_research",
+      "description": "DEPRECATED: use async_research_submit, async_research_status and async_research_list (this combined alias will be removed in the next release). Submit and poll long-running research jobs. Perplexity ended support for async Sonar on 2026-09-27, so submit now queues an Agent API background run (sonar-deep-research -> effort high) and returns its id (resp_...); poll with action 'status' until completed. Ids from the old async Sonar API (bare UUIDs) are still polled through the legacy endpoint for as long as it answers. 'list' shows ids submitted in this server process (not persisted across restarts) plus any legacy async jobs."
+    },
+    {
+      "name": "agent",
+      "description": "Perplexity Agent API: an agentic loop that can call built-in tools (web_search, fetch_url, people_search, finance_search, image_search, sandbox/code-execution), call remote MCP servers via 'mcp_servers' (optionally gated by require_approval), load 'skills' (e.g. Office document generation), accept image ('images') and document ('files') input, and run third-party models. Use for multi-step tasks that need tool use or a specific external model. Distinct from 'search' (single grounded answer). Pick an 'effort' level, a 'model'/'models' chain, or a saved 'profile'; with none of them, effort 'low' is used. The catalog of valid model ids changes over time - call list_models first if you intend to name a specific 'model'/'models' rather than guessing an id; an invalid one is also reported back with the current valid list so you can retry. For long-running work (especially effort 'xhigh'/'ultra'), set background:true and poll the returned id with agent_retrieve; cancel one early with agent_cancel. To continue a prior run without resending context, pass its id as previous_response_id. Files the agent shares are retrieved with agent_files."
+    },
+    {
+      "name": "agent_retrieve",
+      "description": "Retrieve the result of a background Agent API run (one submitted with agent + background:true). Returns the current status and, once complete, the full output. Poll until status is 'completed'. Note: a run submitted with store:false is not retrievable here, though it can still be continued via the agent tool's previous_response_id."
+    },
+    {
+      "name": "agent_cancel",
+      "description": "Cancel an in-progress agent run (typically one submitted with background:true). Cancellation is asynchronous, poll agent_retrieve afterward to confirm the final status."
+    },
+    {
+      "name": "agent_files",
+      "description": "List or retrieve files produced by an agent run's sandbox tool calls. Use action:'list' to see what a run produced, then action:'content' with a file_id to fetch one. Files over 5 MB cannot be inlined and are reported as too large instead. Only files the agent explicitly delivered with its share_file tool are listed (the 'office/*' skills do this; such files also appear under 'Shared files' in the agent output). Files merely written to disk during raw code execution do not appear here, even if the agent reports having written them; ask it to share the file."
+    },
+    {
+      "name": "embeddings",
+      "description": "Generate text embeddings via the Perplexity Embeddings API. Returns a compact summary (model, vector count, token usage) by default; pass full:true to include the raw base64-encoded vectors."
+    },
+    {
+      "name": "contextualized_embeddings",
+      "description": "Generate document-chunk-aware embeddings via the Perplexity Contextualized Embeddings API. Distinct from 'embeddings': input is a nested array, one inner array of chunk strings per document, and chunks from the same document share context awareness, improving retrieval quality for document-based (RAG) applications. Returns a compact summary by default; pass full:true to include the raw base64-encoded vectors."
+    },
+    {
+      "name": "domain_filter",
+      "description": "DEPRECATED: use the per-call search_domain_filter param on search instead (shared state applies to every later search, including parallel ones; this tool will be removed in a later release). Configure domain filtering for search results. Use 'allow' to restrict results to trusted sources (e.g., documentation sites, academic domains) or 'block' to exclude unreliable sources. Maximum 20 domains total. Cannot mix allow and block in the same filter set — use clear_filters first to switch modes. Filters persist across searches until cleared."
+    },
+    {
+      "name": "recency_filter",
+      "description": "DEPRECATED: use the per-call recency (or search_after_date/search_before_date) params on search instead (this tool will be removed in a later release). Control the time window for search results. Essential for time-sensitive queries like news, updates, or recent developments. Filter persists until changed."
+    },
+    {
+      "name": "clear_filters",
+      "description": "DEPRECATED: only affects the stateful filters set by the deprecated domain_filter/recency_filter tools; prefer per-call params on search. Remove all domain filters (both allowed and blocked) and recency filter. Use when switching search contexts or starting fresh."
+    },
+    {
+      "name": "list_filters",
+      "description": "DEPRECATED: only reports the stateful filters set by the deprecated domain_filter/recency_filter tools; prefer per-call params on search. Display current filter configuration including allowed domains, blocked domains, and active recency setting. Useful for debugging search behavior."
+    },
+    {
+      "name": "get_model_info",
+      "description": "Show the Sonar model selection used by 'search': the current model, the default model, whether keyword auto-selection is on, and every model with its routing keywords. Read-only; changes nothing. Use set_model to change the selection."
+    },
+    {
+      "name": "set_model",
+      "description": "Override the Sonar model used by 'search' for all later calls in this server process, or pass 'auto' to restore the default model with keyword auto-selection. A set model is still overridden when a query strongly matches another model's keywords. For one call only, use search's 'effort' param instead (agent backend), which bypasses this selection and does not change shared state."
+    },
+    {
+      "name": "model_info",
+      "description": "DEPRECATED: use get_model_info (view) and set_model (override) (this alias will be removed in the next release). Calling it with no arguments RESETS the selection to the default. View available Perplexity models and their specializations, or manually override model selection. By default, models are auto-selected based on query intent (research, reasoning, general search)."
+    },
+    {
+      "name": "list_models",
+      "description": "List the models currently available to your account via the live GET /v1/models endpoint (dynamic discovery), grouped by provider. These are the models usable through the 'agent' tool's 'model'/'models' params: provider-qualified ids (e.g. 'anthropic/claude-sonnet-5-5', 'openai/gpt-6-sol', 'perplexity/sonar'). It does not list the Sonar models used by 'search' (sonar-pro, sonar-reasoning-pro, ...); see get_model_info for those. Call this before using 'agent' with an explicit 'model' or 'models' value - the catalog changes over time, so an id from memory or an older run may no longer be valid; use 'provider' to narrow to one vendor. Distinct from get_model_info/set_model, which manage the stateful Sonar model used by 'search'."
+    },
+    {
+      "name": "decisions",
+      "description": "Perplexity Decisions API: answer one or more named questions about some content ('state') with calibrated probabilities instead of prose. Question types: 'noul' (yes/no or true/false; returns P(yes)), 'choice' (pick one of your named options; returns the winner, confidence and per-option probabilities), 'score' (rate on an ordered rubric; returns the expected level, confidence and per-level probabilities). Use it for classification, gating, triage, fact-checking or rubric grading where you want a number, not an essay. No rationale text is returned. Set mode:'web_grounding' to run one web search per question first (sources are listed) and, if 'state' is just a URL, fetch that page as the state. Very cheap: $0.02 (or $0.01 for flash models) per million input tokens, output free, plus $0.001 per web search/fetch."
+    },
+    {
+      "name": "list_skills",
+      "description": "List the custom (managed) skills uploaded to this Perplexity project, or get one by skill_id. Use it to find the 'skill_...' id to pass to the agent tool as skills: [{type:'custom', id}]. Builtin skills (office, office/docx, office/pdf, office/pptx, office/xlsx) and inline skills need no lookup. Read-only; uploading or deleting skills is not supported here."
+    }
+  ]
+}
