@@ -25,7 +25,7 @@ import { EnvironmentConfig } from "../config/environment.js";
 import { DEFAULT_AGENT_EFFORT } from "../schemas/types.js";
 import { buildAgentInput, buildWebSearchTool } from "../utils/agentRequest.js";
 import { DecisionsArgs } from "../schemas/types.js";
-import { DEFAULT_DECISION_MODEL } from "../config/constants.js";
+import { DEFAULT_DECISION_MODEL, SERVER_CONFIG } from "../config/constants.js";
 
 /**
  * SDK per-request options built from a HandlerContext. Every SDK call in this
@@ -39,7 +39,9 @@ function requestOptions(ctx: HandlerContext = {}): { signal?: AbortSignal } {
 }
 
 // Identifies this MCP server to Perplexity; only sent to the public API host.
-const INTEGRATION_HEADERS = { "X-Pplx-Integration": "perplexity-mcp" };
+// Follows Perplexity's "<slug>/<version>" convention and replaces the SDK's
+// default "perplexity-node/<sdk version>" value.
+const INTEGRATION_HEADERS = { "X-Pplx-Integration": `perplexity-mcp/${SERVER_CONFIG.version}` };
 
 function isPerplexityApiHost(baseURL: string): boolean {
 	try {
